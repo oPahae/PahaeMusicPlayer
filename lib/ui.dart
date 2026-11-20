@@ -15,7 +15,9 @@ const _palettes = <List<Color>>[
   [Color(0xFFEC4899), Color(0xFFF97316)],
 ];
 
-List<Color> paletteFor(String key) => _palettes[key.hashCode.abs() % _palettes.length];
+int paletteIndex(String key) => key.hashCode.abs() % _palettes.length;
+
+List<Color> paletteFor(String key) => _palettes[paletteIndex(key)];
 
 LinearGradient gradientFor(String key) => LinearGradient(
       colors: paletteFor(key),

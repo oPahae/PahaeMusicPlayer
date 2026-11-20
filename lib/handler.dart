@@ -1,6 +1,42 @@
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
 import 'store.dart';
+import 'ui.dart' show paletteFor, paletteIndex;
+
+Future<Uri> _defaultArt(String key) async {
+  final dir = await getApplicationSupportDirectory();
+  final f = File('${dir.path}/art_v1_${paletteIndex(key)}.png');
+  if (!f.existsSync()) {
+    const s = 512.0;
+    final rec = ui.PictureRecorder();
+    final c = ui.Canvas(rec);
+    c.drawRect(
+      const ui.Rect.fromLTWH(0, 0, s, s),
+      ui.Paint()..shader = ui.Gradient.linear(ui.Offset.zero, const ui.Offset(s, s), paletteFor(key)),
+    );
+    final w = ui.Paint()..color = const ui.Color(0xFFFFFFFF);
+    ui.Offset p(double x, double y) => ui.Offset(x * s, y * s);
+    for (final h in const [ui.Offset(0.36, 0.69), ui.Offset(0.68, 0.63)]) {
+      c.drawOval(ui.Rect.fromCenter(center: p(h.dx, h.dy), width: 0.19 * s, height: 0.14 * s), w);
+    }
+    c.drawRect(ui.Rect.fromPoints(p(0.4225, 0.30), p(0.4475, 0.69)), w);
+    c.drawRect(ui.Rect.fromPoints(p(0.7425, 0.24), p(0.7675, 0.63)), w);
+    final beam = ui.Path()
+      ..moveTo(p(0.4225, 0.285).dx, p(0.4225, 0.285).dy)
+      ..lineTo(p(0.7675, 0.225).dx, p(0.7675, 0.225).dy)
+      ..lineTo(p(0.7675, 0.295).dx, p(0.7675, 0.295).dy)
+      ..lineTo(p(0.4225, 0.355).dx, p(0.4225, 0.355).dy)
+      ..close();
+    c.drawPath(beam, w);
+    final img = await rec.endRecording().toImage(512, 512);
+    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+    await f.writeAsBytes(bytes!.buffer.asUint8List());
+  }
+  return Uri.file(f.path);
+}
 
 class PlayerHandler extends BaseAudioHandler {
   PlayerHandler() {
@@ -45,8 +81,18 @@ class PlayerHandler extends BaseAudioHandler {
         duration: same ? Store.i.player.duration : null,
         artUri: s.cover != null ? Uri.file(s.cover!) : null,
       ));
+      _setArt(s);
     }
     _broadcast();
+  }
+
+  Future<void> _setArt(Song s) async {
+    if (s.cover != null) return;
+    try {
+      final u = await _defaultArt(s.title);
+      final m = mediaItem.value;
+      if (m != null && m.id == s.path && m.artUri == null) mediaItem.add(m.copyWith(artUri: u));
+    } catch (_) {}
   }
 
   void _broadcast() {

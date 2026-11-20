@@ -15,6 +15,9 @@ Future<void> main() async {
       androidNotificationChannelName: 'PahaeMusic',
       androidNotificationIcon: 'drawable/ic_notification',
       androidNotificationOngoing: false,
+      notificationColor: Color(0xFF8B5CF6),
+      artDownscaleWidth: 512,
+      artDownscaleHeight: 512,
     ),
   );
   Store.i.init();
