@@ -1,0 +1,21 @@
+name: music_app
+description: Lecteur de musique avec best parts.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  just_audio: ^0.9.40
+  audio_service: ^0.18.15
+  permission_handler: ^11.3.1
+  shared_preferences: ^2.3.2
+  image_picker: ^1.1.2
+  path_provider: ^2.1.4
+  path: ^1.9.0
+
+flutter:
+  uses-material-design: true
