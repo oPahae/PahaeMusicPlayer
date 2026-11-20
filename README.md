@@ -110,6 +110,6 @@ music_app/
 
 ## Licence
 
-Ce projet est sous licence PolyForm Noncommercial 1.0.0.
+Ce projet est sous licence **[PolyForm Noncommercial 1.0.0](LICENSE)**.
 
-Cela signifie que tu peux utiliser, modifier et redistribuer le code gratuitement pour un usage non commercial (usage personnel, éducatif, associatif, expérimentation). La vente ou l'exploitation commerciale du logiciel n'est pas autorisée sans l'accord explicite de l'auteur.
+Cela signifie que tu peux utiliser, modifier et redistribuer le code **gratuitement pour un usage non commercial** (usage personnel, éducatif, associatif, expérimentation). **La vente ou l'exploitation commerciale du logiciel n'est pas autorisée** sans l'accord explicite de l'auteur. redistribuer le code gratuitement pour un usage non commercial (usage personnel, éducatif, associatif, expérimentation). La vente ou l'exploitation commerciale du logiciel n'est pas autorisée sans l'accord explicite de l'auteur.
