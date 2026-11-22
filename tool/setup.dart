@@ -38,6 +38,7 @@ Future<void> main() async {
   var xml = manifest.readAsStringSync();
   xml = xml.replaceFirst(RegExp(r'android:label="[^"]*"'), 'android:label="PahaeMusic"');
   const perms = <String, String>{
+    'android.permission.INTERNET': '<uses-permission android:name="android.permission.INTERNET"/>',
     'android.permission.READ_MEDIA_AUDIO':
         '<uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>',
     'android.permission.READ_EXTERNAL_STORAGE':

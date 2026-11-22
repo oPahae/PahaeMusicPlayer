@@ -2,13 +2,17 @@
 import android.app.Activity
 import android.app.RecoverableSecurityException
 import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Intent
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.MediaStore
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
 
 class MainActivity : AudioServiceActivity() {
     private var pending: MethodChannel.Result? = null
@@ -23,6 +27,13 @@ class MainActivity : AudioServiceActivity() {
                     "ping" -> result.success("2")
                     "songs" -> songs(result)
                     "delete" -> delete(call.argument<List<Number>>("ids") ?: emptyList(), result)
+                    "import" -> importAudio(
+                        call.argument<String>("path") ?: "",
+                        call.argument<String>("name") ?: "musique.m4a",
+                        call.argument<String>("title") ?: "musique",
+                        call.argument<String>("mime") ?: "audio/mp4",
+                        result
+                    )
                     else -> result.notImplemented()
                 }
             }
@@ -67,11 +78,81 @@ class MainActivity : AudioServiceActivity() {
         }
     }
 
+    private fun importAudio(
+        path: String,
+        name: String,
+        title: String,
+        mime: String,
+        result: MethodChannel.Result
+    ) {
+        try {
+            val src = File(path)
+            if (Build.VERSION.SDK_INT >= 29) {
+                val values = ContentValues().apply {
+                    put(MediaStore.Audio.Media.DISPLAY_NAME, name)
+                    put(MediaStore.Audio.Media.TITLE, title)
+                    put(MediaStore.Audio.Media.MIME_TYPE, mime)
+                    put(MediaStore.Audio.Media.RELATIVE_PATH, "Music/PahaeMusic")
+                    put(MediaStore.Audio.Media.IS_MUSIC, 1)
+                    put(MediaStore.Audio.Media.IS_PENDING, 1)
+                }
+                val uri = contentResolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
+                    ?: throw Exception("insertion impossible")
+                contentResolver.openOutputStream(uri)?.use { out ->
+                    src.inputStream().use { it.copyTo(out) }
+                } ?: throw Exception("écriture impossible")
+                val done = ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }
+                contentResolver.update(uri, done, null, null)
+                result.success(uri.toString())
+            } else {
+                val dir = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
+                    "PahaeMusic"
+                )
+                dir.mkdirs()
+                val dest = File(dir, name)
+                src.copyTo(dest, true)
+                MediaScannerConnection.scanFile(this, arrayOf(dest.absolutePath), arrayOf(mime), null)
+                result.success(dest.absolutePath)
+            }
+            src.delete()
+        } catch (e: Exception) {
+            result.error("import", e.toString(), null)
+        }
+    }
+
+    private var deleteIds: List<Long> = emptyList()
+
+    private fun uriOf(id: Long): Uri =
+        ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
+
+    private fun exists(id: Long): Boolean = try {
+        contentResolver.query(uriOf(id), arrayOf(MediaStore.Audio.Media._ID), null, null, null)
+            ?.use { it.count > 0 } ?: false
+    } catch (e: Exception) {
+        false
+    }
+
+    private fun finishDelete(cancelled: Boolean) {
+        val gone = ArrayList<Long>()
+        val failed = ArrayList<Long>()
+        for (id in deleteIds) {
+            if (!cancelled && exists(id)) {
+                try {
+                    contentResolver.delete(uriOf(id), null, null)
+                } catch (e: Exception) {
+                }
+            }
+            if (exists(id)) failed.add(id) else gone.add(id)
+        }
+        pending?.success(mapOf("deleted" to gone, "failed" to failed, "cancelled" to cancelled))
+        pending = null
+    }
+
     private fun delete(ids: List<Number>, result: MethodChannel.Result) {
         try {
-            val uris = ids.map {
-                ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, it.toLong())
-            }
+            deleteIds = ids.map { it.toLong() }
+            val uris = deleteIds.map { uriOf(it) }
             pending = result
             if (Build.VERSION.SDK_INT >= 30) {
                 val pi = MediaStore.createDeleteRequest(contentResolver, uris)
@@ -100,27 +181,23 @@ class MainActivity : AudioServiceActivity() {
                     )
                     return
                 }
-                pending?.error("delete", e.toString(), null)
-                pending = null
+                finishDelete(false)
                 return
             }
         }
-        pending?.success(true)
-        pending = null
+        finishDelete(false)
     }
 
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 4711) {
-            pending?.success(resultCode == Activity.RESULT_OK)
-            pending = null
+            finishDelete(resultCode != Activity.RESULT_OK)
         } else if (requestCode == 4712) {
             if (resultCode == Activity.RESULT_OK) {
                 deleteFrom(legacyIndex)
             } else {
-                pending?.success(false)
-                pending = null
+                finishDelete(true)
             }
         }
     }
