@@ -1,6 +1,7 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'download.dart';
 import 'handler.dart';
 import 'player.dart';
 import 'store.dart';
@@ -85,7 +86,7 @@ class _HomeState extends State<Home> {
         child: SafeArea(
           bottom: false,
           child: Column(children: [
-            Expanded(child: IndexedStack(index: tab, children: const [SongsTab(), PlaylistsTab()])),
+            Expanded(child: IndexedStack(index: tab, children: const [SongsTab(), PlaylistsTab(), DownloadTab()])),
             const MiniPlayer(),
           ]),
         ),
@@ -100,6 +101,8 @@ class _HomeState extends State<Home> {
               icon: Icon(Icons.library_music_outlined), selectedIcon: Icon(Icons.library_music_rounded), label: 'Titres'),
           NavigationDestination(
               icon: Icon(Icons.queue_music_outlined), selectedIcon: Icon(Icons.queue_music_rounded), label: 'Playlists'),
+          NavigationDestination(
+              icon: Icon(Icons.download_outlined), selectedIcon: Icon(Icons.download_rounded), label: 'Télécharger'),
         ],
       ),
     );

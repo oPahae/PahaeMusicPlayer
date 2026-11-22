@@ -176,6 +176,11 @@ class Store extends ChangeNotifier {
     });
   }
 
+  Future<void> importAudio(String path, String name, String title, String mime) async {
+    await _ch.invokeMethod<String>('import', {'path': path, 'name': name, 'title': title, 'mime': mime});
+    await scan();
+  }
+
   void setSort(String v) {
     sort = v;
     _applySort();
@@ -309,11 +314,17 @@ class Store extends ChangeNotifier {
       for (final s in list)
         if (s.mediaId != null) s.mediaId!
     ];
+    final removed = <String>{};
+    var cancelled = false;
     String? err;
     if (ids.isNotEmpty) {
       try {
-        final r = await _ch.invokeMethod<bool>('delete', {'ids': ids});
-        if (r != true) err = 'Suppression annulée';
+        final r = await _ch.invokeMethod<Map<dynamic, dynamic>>('delete', {'ids': ids});
+        final gone = ((r?['deleted'] as List?) ?? []).map((e) => (e as num).toInt()).toSet();
+        cancelled = r?['cancelled'] == true;
+        for (final s in list) {
+          if (s.mediaId != null && gone.contains(s.mediaId)) removed.add(s.path);
+        }
       } on MissingPluginException {
         err = 'Installation incomplète : lancez « dart tool/setup.dart » puis réinstallez l’application';
       } on PlatformException catch (e) {
@@ -325,32 +336,36 @@ class Store extends ChangeNotifier {
     for (final s in list.where((s) => s.mediaId == null)) {
       try {
         File(s.path).deleteSync();
-      } catch (_) {
-        err = 'Fichier impossible à supprimer';
-      }
+        removed.add(s.path);
+      } catch (_) {}
     }
+    if (removed.isNotEmpty) {
+      final cur = current?.path;
+      songs.removeWhere((s) => removed.contains(s.path));
+      for (final pl in playlists) {
+        pl.paths.removeWhere(removed.contains);
+      }
+      if (cur != null) {
+        if (removed.contains(cur)) {
+          await player.stop();
+          queue = [];
+          index = -1;
+        } else {
+          queue = queue.where((s) => !removed.contains(s.path)).toList();
+          index = queue.indexWhere((s) => s.path == cur);
+        }
+      }
+      for (final x in removed) {
+        _meta.remove(x);
+      }
+      _commit();
+    }
+    if (removed.length == list.length) return null;
     if (err != null) return err;
-    final paths = {for (final s in list) s.path};
-    final cur = current?.path;
-    songs.removeWhere((s) => paths.contains(s.path));
-    for (final pl in playlists) {
-      pl.paths.removeWhere(paths.contains);
+    if (removed.isEmpty) {
+      return cancelled ? 'Suppression annulée' : 'Android a refusé de supprimer ce fichier';
     }
-    if (cur != null) {
-      if (paths.contains(cur)) {
-        await player.stop();
-        queue = [];
-        index = -1;
-      } else {
-        queue = queue.where((s) => !paths.contains(s.path)).toList();
-        index = queue.indexWhere((s) => s.path == cur);
-      }
-    }
-    for (final x in paths) {
-      _meta.remove(x);
-    }
-    _commit();
-    return null;
+    return '${list.length - removed.length} musique(s) n’ont pas pu être supprimées';
   }
 
   Playlist createPlaylist(String name) {
